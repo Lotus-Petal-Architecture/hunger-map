@@ -78,7 +78,7 @@ var fitBounds = [
 var map = new L.map('map', {
     center: [30, -98],
     zoom: 3,
-    minZoom: 4,
+    minZoom: 3,
     maxZoom: 12,
     zoomDelta: 2,
     maxBounds: maxBounds,
@@ -96,13 +96,13 @@ function getColorConfirmedGrowth(d) {
     return d > 8000 ?'#991200':
     d > 2000 ?  '#E81401':
     d > 700  ? '#FE9900' :
-    d > 300  ? '#F75C01' :
-    d > 50   ? '#FD8D3C' :
-    d > 20   ? '#FEB24C' :
-    d > 10   ? '#FED976' :
+    d > 300   ? '#F75C01' :
+    d > 100   ? '#FD8D3C' :
                 '#FFEDA0';
     
 };
+
+
 
 function style(feature) {
     return {
@@ -195,10 +195,12 @@ info.onAdd = function (map) {
 info.update = function (props) {
     this._div.innerHTML = '<h3>US Food Insecurity Cases by County</h3>' +
         (props ? '<b>' + props.properties.NAME + (props.properties.STATENAME ? ', ' + props.properties.STATENAME : '') +
+            '<br />Total Population: ' + (props.POPESTIMATE2019 ? numberWithCommas(props.POPESTIMATE2019) : '0') +
+	    '<br />Total Experiencing Food Insecurity Per Million: ' + (props.growthrate ? numberWithCommas(props.growthrate) : '0') +
             '</b><br />Total Population Experiencing Food Insecurity: ' + (props.popInsecure ? numberWithCommas(props.popInsecure) : '0') +
             '<br />Total Children Experiencing Food Insecurity: ' + (props.children ? numberWithCommas(props.children) : '0') +
-           '<br />Percentage of Total Food Insecurity Population: ' + (props.popInsecurePercent ? percentPop(props.popInsecurePercent) : '0') + '%' +
-           '<br />Percentage of Children Experiencing Food Insecurity: ' + (props.childrenPercentage ? percentChildren(props.childrenPercentage) : '0') + '%' +
+          // '<br />Percentage of Total Food Insecurity Population: ' + (props.popInsecurePercent ? percentPop(props.popInsecurePercent) : '0') + '%' +
+          // '<br />Percentage of Children Experiencing Food Insecurity: ' + (props.childrenPercentage ? percentChildren(props.childrenPercentage) : '0') + '%' +
            // '<br />New Cases, Past 14 Days: ' + (props.growthdiff ? numberWithCommas(props.growthdiff) : '0') +
            // '<br />New Cases Per 10,000 Residents,<br />Past 14 Days<b>: ' + (props.growthrate ? numberWithCommas(props.growthrate) : '0') + '</b>' +
           //  '<br /><span class="infoupdated">Last Updated: ' + (props.Last_Update ? props.Last_Update : '0') + ' EST</span>' +
@@ -213,7 +215,7 @@ var legend = L.control({
 });
 legend.onAdd = function (map) {
     var div = L.DomUtil.create('div', 'info legend'),
-        grades =  [0, 10, 20, 50, 300, 700, 2000, 8000],
+        grades =  [0, 100, 300 ,700,2000 ,8000 ],
         labels = ['<div class="header-text">Food Insecurity by Population</div>'],
         from, to;
 
@@ -231,7 +233,7 @@ legend.onAdd = function (map) {
 };
 legend.addTo(map);
 
-map.attributionControl.setPrefix('Food Insecurity data provided by Gundersen, C., A. Dewey, E. Engelhard (2020). The Impact of the Coronavirus on Food Insecurity in 2020 [Data file and FAQ]. Available from Feeding America: <a href= "mailto: research@feedingamerica.org">research@feedingamerica.org</a>. <a href="https://leafletjs.com/" target="_blank">Leaflet</a>');
+map.attributionControl.setPrefix('Food Insecurity data provided by Gundersen, C., A. Dewey, E. Engelhard (2020). The Impact of the Coronavirus on Food Insecurity in 2020 [Data file and FAQ]. Available from <a href="https://www.feedingamerica.org/" target="_blank">Feeding America:</a> <a href=" mailto: research@feedingamerica.org">research@feedingamerica.org</a>. <a href="https://leafletjs.com/" target="_blank">Leaflet</a>');
 
 var panelcontent = L.control({
     position: 'bottomleft'
@@ -277,7 +279,7 @@ panelcontent.update = function (props) {
           //  '<p><a href="https://www.charitynavigator.org/index.cfm?keyword_list=&bay=search.results&EIN=&cgid=2&cuid=&location=2&state=' + props.properties.STATECODE + '&city=&overallrtg=&size=&scopeid=" target="_blank">Community and Culture <span class="gobtn">Go</span></a>' +
           //  '<span class="description"><strong>Community and Culture</strong><br />Organizations focused on supporting the arts and cultural community sector. Many performing artists such as musicians and actors, are unable to work right now due to the virus, and may have trouble accessing unemployment benefits due to the nature of the gig economy. We recognize that art is a cultural asset that must be protected.</span></p>' +
             '<div style="margin-top: 10px;">&copy; 2020 GreenSlate.us</div>' +
-            '</div><div id="catdescription">Click the Food Insecurity resource to donate immediately to a registered local charity.</div>'
+            '</div><div id="catdescription"><strong>Give Now to end hunger across America.</strong> Click the Food Insecurity resource to donate immediately to a registered local charity. You will be taken to Charitynavigator.org to complete your transaction.</div>'
 
 
             :
@@ -295,51 +297,56 @@ var county_names = [];
 var total_cases = []; //total confirmed cases
 var total_deaths = []; //total deaths
 
-var old_cases = [];
+/* var old_cases = [];
 var old_deaths = [];
+*/
 
 var growthcalc = [];
 var growthcalc_today = [];
-var growthcalc_tenday = [];
+
+/* var growthcalc_tenday = [];
+*/
 
 var growthrates = [];
 
+function growth_percent_calc(popInsecure, population) {
+    var growth_calc = (popInsecure / population) * 1000000;
+    growth_calc = parseFloat(growth_calc).toFixed(0);
+    if ( growth_calc < 0 || isNaN(growth_calc)) growth_calc = 'Unavailable';
+    return growth_calc;
+}
 
 
 
+function growth_percent_diff(confirmed, population) {
+    //var growth_calc = ((confirmed - old_confirmed));
 
-function growth_percent_calc(confirmed, old_confirmed, population) {
-    var growth_calc = ((population > 10000) ? ((confirmed - old_confirmed) / (population / 10000)) : (confirmed - old_confirmed));
-    growth_calc = growth_calc.toFixed(0);
+    var growth_calc = confirmed;	
+    parseFloat(growth_calc).toFixed(0);
 
     if (growth_calc < 0 || isNaN(growth_calc)) growth_calc = 'Unavailable';
 
     return growth_calc;
 }
 
-function growth_percent_diff(confirmed, old_confirmed, population) {
-    var growth_calc = ((confirmed - old_confirmed));
-    growth_calc = growth_calc.toFixed(0);
-
-    if (growth_calc < 0 || isNaN(growth_calc)) growth_calc = 'Unavailable';
-
-    return growth_calc;
-}
 
 (function () {
-    covid19_data = mergeByIdAgain(stateData, population);
+    stateData = mergeByIdAgain(stateData, population);
 
     var dates = stateData.distinct('Last_Update');
     last_updated = dates[0];
 
     for (var i = 0; i < stateData.length; i++) {
-      county =   stateData[i];
+        county =   stateData[i];
       
 
         var county_name = county.Admin2 + ' County, ' + county.Province_State + ', ' + county.Country_Region;
-        var county_confirmed = county.Confirmed;
+        var county_confirmed = county.popInsecure;
         var county_deaths = county.children;
-        var old_confirmed = county.Confirmed;
+
+/*        var old_confirmed = county.Confirmed;
+*/
+
         var fips = county.FIPS;
         var popest = county.POPESTIMATE2019;
           
@@ -357,6 +364,7 @@ function growth_percent_diff(confirmed, old_confirmed, population) {
         
     }
 
+/*
     for (var i = 0; i < stateData.length; i++) {
         var county = stateData[i];
         var county_confirmed = county.popInsecure;
@@ -371,17 +379,23 @@ function growth_percent_diff(confirmed, old_confirmed, population) {
     }
 
     growth_calc = mergeByIdFips(growthcalc_today, growthcalc_tenday);
+*/
+
+    growth_calc = growthcalc_today;
 
     covid19_counties = mergeById(us_counties.features, population);
 
     for (var i = 0; i < growth_calc.length; i++) {
         var county = growth_calc[i];
         var today = county.today;
-        var old = county.old;
+
+/*        var old = county.old;
+*/
+
         var fips = county.fips;
         var countypop = county.population;
-        var county_growthdiff = growth_percent_diff(today, old, countypop);
-        var county_growthrate = growth_percent_calc(today, old, countypop);
+        var county_growthdiff = growth_percent_diff(today, countypop);
+        var county_growthrate = growth_percent_calc(today, countypop);
 
         growthrates.push({
             'fips': fips,
@@ -394,6 +408,8 @@ function growth_percent_diff(confirmed, old_confirmed, population) {
 
     covid19_counties_growth = mergeByIdGrowth(covid19_data_pop, growthrates);
 })();
+
+console.log(covid19_counties_growth);
 
 window.addEventListener("load", function () {
     geojson = L.geoJson(covid19_counties_growth, {
