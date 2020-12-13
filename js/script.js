@@ -216,7 +216,7 @@ var legend = L.control({
 legend.onAdd = function (map) {
     var div = L.DomUtil.create('div', 'info legend'),
         grades =  [0, 100, 300 ,700,2000 ,8000 ],
-        labels = ['<div class="header-text">Food Insecurity by Population</div>'],
+        labels = ['<div class="header-text">Food Insecurity by Population Per Million</div>'],
         from, to;
 
     for (var i = 0; i < grades.length; i++) {
